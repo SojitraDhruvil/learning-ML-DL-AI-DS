@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RNN Playground</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --bg2: #111827;
+    --bg3: #1a2235;
+    --border: #1e2d45;
+    --accent: #38bdf8;
+    --accent2: #818cf8;
+    --accent3: #34d399;
+    --coral: #fb7185;
+    --amber: #fbbf24;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --teal-glow: rgba(56,189,248,0.12);
+    --purple-glow: rgba(129,140,248,0.12);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(56,189,248,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(56,189,248,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 24px 60px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Header */
+  header {
+    padding: 40px 0 32px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 36px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .logo {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+  .logo span { color: var(--accent); }
+  .logo small {
+    display: block;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 2px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  /* Cards */
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+    transition: border-color 0.2s;
+  }
+  .card:hover { border-color: #2a3d58; }
+
+  .card-title {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--accent);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-title::before {
+    content: '';
+    width: 3px;
+    height: 14px;
+    background: var(--accent);
+    border-radius: 2px;
+    display: inline-block;
+  }
+
+  /* Two-column layout */
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media (max-width: 720px) { .grid2 { grid-template-columns: 1fr; } }
+
+  /* Input controls */
+  label {
+    display: block;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.5px;
+  }
+
+  input[type=number], input[type=text], select {
+    width: 100%;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  input[type=number]:focus, input[type=text]:focus, select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(56,189,248,0.1);
+  }
+  select { cursor: pointer; }
+  select option { background: var(--bg2); }
+
+  .form-group { margin-bottom: 16px; }
+
+  /* Data table */
+  .data-table-wrap {
+    overflow-x: auto;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+  }
+  th {
+    background: var(--bg3);
+    color: var(--accent);
+    padding: 10px 14px;
+    text-align: center;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 8px 10px;
+    text-align: center;
+    border-bottom: 1px solid rgba(30,45,69,0.5);
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(56,189,248,0.04); }
+
+  td input {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    padding: 4px 8px;
+    width: 90px;
+    text-align: center;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  td input:focus {
+    border-color: var(--accent);
+    background: var(--bg3);
+  }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.18s;
+    letter-spacing: 0.3px;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #0a0e1a;
+  }
+  .btn-primary:hover { background: #7dd3fc; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(56,189,248,0.3); }
+  .btn-secondary {
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+  }
+  .btn-secondary:hover { background: var(--teal-glow); }
+  .btn-danger {
+    background: transparent;
+    color: var(--coral);
+    border: 1px solid rgba(251,113,133,0.3);
+    font-size: 12px;
+    padding: 6px 12px;
+  }
+  .btn-danger:hover { background: rgba(251,113,133,0.08); }
+
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+
+  /* RNN Visualizer */
+  #rnn-canvas-wrap {
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-radius: 10px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    padding: 0;
+    line-height: 0;
+  }
+
+  canvas#rnnCanvas {
+    display: block;
+    /* width set by JS; scrollable if wider than container */
+    min-width: 100%;
+    border-radius: 10px;
+    cursor: default;
+  }
+
+  /* Step-through controls */
+  .step-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+  .step-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg3);
+    color: var(--text);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+  }
+  .step-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .step-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .step-info {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    flex: 1;
+  }
+  .step-info strong { color: var(--accent); }
+
+  /* Output panel */
+  .output-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px;
+    margin-top: 4px;
+  }
+  .stat-box {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .stat-label {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 6px;
+  }
+  .stat-value {
+    font-size: 20px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .stat-value.accent { color: var(--accent); }
+  .stat-value.purple { color: var(--accent2); }
+  .stat-value.green  { color: var(--accent3); }
+  .stat-value.coral  { color: var(--coral); }
+
+  /* Window preview */
+  .window-row {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+  .win-cell {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    transition: all 0.3s;
+    min-width: 52px;
+    text-align: center;
+  }
+  .win-cell.active {
+    border-color: var(--accent);
+    background: var(--teal-glow);
+    color: var(--accent);
+    transform: translateY(-3px);
+    box-shadow: 0 4px 12px rgba(56,189,248,0.2);
+  }
+  .win-cell.target {
+    border-color: var(--coral);
+    background: rgba(251,113,133,0.1);
+    color: var(--coral);
+    transform: translateY(-3px);
+  }
+  .win-arrow {
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  /* Info pill */
+  .pill {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+  }
+  .pill-blue  { background: rgba(56,189,248,0.12); color: var(--accent); border: 1px solid rgba(56,189,248,0.2); }
+  .pill-purple{ background: rgba(129,140,248,0.12); color: var(--accent2); border: 1px solid rgba(129,140,248,0.2); }
+  .pill-green { background: rgba(52,211,153,0.12); color: var(--accent3); border: 1px solid rgba(52,211,153,0.2); }
+  .pill-coral { background: rgba(251,113,133,0.12); color: var(--coral); border: 1px solid rgba(251,113,133,0.2); }
+
+  /* Shape badge row */
+  .shape-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+  .shape-eq {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  /* Log / explanation */
+  #log {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.7;
+    min-height: 60px;
+    margin-top: 16px;
+    white-space: pre-wrap;
+  }
+  #log .hi { color: var(--accent); }
+  #log .hi2 { color: var(--accent2); }
+  #log .hi3 { color: var(--accent3); }
+  #log .warn { color: var(--coral); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg2); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* section divider */
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 2.5px;
+    color: var(--muted);
+    margin-bottom: 10px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* tooltip */
+  .tooltip-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 1px solid var(--muted);
+    font-size: 10px;
+    color: var(--muted);
+    cursor: help;
+    margin-left: 6px;
+    font-family: monospace;
+    position: relative;
+  }
+  .tooltip-icon:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    left: 20px;
+    top: -4px;
+    background: #1e2d45;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 11px;
+    color: var(--text);
+    white-space: nowrap;
+    z-index: 10;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .note {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="logo">
+      RNN <span>Playground</span>
+      <small>Recurrent Neural Network — Interactive Explorer</small>
+    </div>
+    <span class="badge">look_back · sliding window · unrolled</span>
+  </header>
+
+  <!-- ─── SECTION 1: Data Input ─── -->
+  <div class="card">
+    <div class="card-title">1 · Input Data</div>
+    <div class="grid2">
+      <div>
+        <div class="form-group">
+          <label>Sequence (comma separated values)</label>
+          <input type="text" id="seqInput" value="100,120,130,125,140,155,148,162,170,175,168,180,190,185,200" placeholder="e.g. 100,120,130,125...">
+        </div>
+        <div class="form-group">
+          <label>look_back  <span class="tooltip-icon" data-tip="Number of past time steps used as input">?</span></label>
+          <input type="number" id="lookBack" value="4" min="1" max="12">
+        </div>
+        <div class="form-group">
+          <label>Feature column (0-indexed, 0 = only feature)</label>
+          <input type="number" id="featureCol" value="0" min="0" max="0" disabled>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="buildDataset()">▶ Build Dataset</button>
+          <button class="btn btn-secondary" onclick="loadSample('stock')">Load stock sample</button>
+          <button class="btn btn-secondary" onclick="loadSample('sine')">Load sine wave</button>
+        </div>
+      </div>
+      <div>
+        <div class="section-label">Resulting Tensor Shapes</div>
+        <div class="shape-row" id="shapeRow">
+          <span class="pill pill-blue">trainX: —</span>
+          <span class="shape-eq">→</span>
+          <span class="pill pill-purple">(samples, look_back, 1)</span>
+          <span class="shape-eq">|</span>
+          <span class="pill pill-coral">trainY: —</span>
+        </div>
+        <div class="note" id="shapeNote">Enter data and press Build Dataset.</div>
+
+        <div style="margin-top:20px">
+          <div class="section-label">Sliding Window Preview</div>
+          <div class="window-row" id="windowPreview">
+            <span style="color:var(--muted);font-size:12px;font-family:monospace">Press Build Dataset first</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── SECTION 2: Dataset Table ─── -->
+  <div class="card" id="datasetCard" style="display:none">
+    <div class="card-title">2 · Dataset Windows  <span id="totalWindows" class="pill pill-blue" style="margin-left:8px;font-size:11px"></span></div>
+    <div class="data-table-wrap">
+      <table id="datasetTable">
+        <thead id="tableHead"></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+    <p class="note" style="margin-top:10px">✎ Click any cell to edit values directly</p>
+  </div>
+
+  <!-- ─── SECTION 3: RNN Visualizer ─── -->
+  <div class="card" id="vizCard" style="display:none">
+    <div class="card-title">3 · RNN Unrolled Visualizer</div>
+
+    <div id="rnn-canvas-wrap">
+      <canvas id="rnnCanvas"></canvas>
+    </div>
+
+    <div class="step-controls">
+      <button class="step-btn" id="btnFirst" onclick="stepTo(0)" title="First">⏮</button>
+      <button class="step-btn" id="btnPrev"  onclick="stepBy(-1)" title="Previous">◀</button>
+      <button class="step-btn" id="btnPlay"  onclick="togglePlay()" title="Play/Pause">▶</button>
+      <button class="step-btn" id="btnNext"  onclick="stepBy(1)"  title="Next">▶</button>
+      <button class="step-btn" id="btnLast"  onclick="stepTo(windows.length-1)" title="Last">⏭</button>
+      <div class="step-info">
+        Window <strong id="stepLabel">—</strong> of <strong id="stepTotal">—</strong>
+        &nbsp;|&nbsp; input: <strong id="stepInput" style="color:var(--accent)">—</strong>
+        &nbsp;→&nbsp; target: <strong id="stepTarget" style="color:var(--coral)">—</strong>
+      </div>
+    </div>
+
+    <div id="log">Press Build Dataset, then use the controls above to step through each window.</div>
+  </div>
+
+  <!-- ─── SECTION 4: Stats ─── -->
+  <div class="card" id="statsCard" style="display:none">
+    <div class="card-title">4 · Dataset Stats</div>
+    <div class="output-grid" id="statsGrid"></div>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+// ─── State ───
+let sequence = [];
+let windows  = [];   // [{x: [...], y: value}]
+let lookBack = 4;
+let currentStep = 0;
+let playTimer = null;
+
+// ─── Samples ───
+function loadSample(type) {
+  if (type === 'stock') {
+    document.getElementById('seqInput').value = '100,104,102,108,115,112,120,118,125,130,128,135,140,137,144';
+    document.getElementById('lookBack').value = 4;
+  } else {
+    const vals = [];
+    for (let i = 0; i < 20; i++) vals.push(Math.round(50 + 40 * Math.sin(i * 0.5) + (Math.random()-0.5)*5));
+    document.getElementById('seqInput').value = vals.join(',');
+    document.getElementById('lookBack').value = 5;
+  }
+  buildDataset();
+}
+
+// ─── Build Dataset ───
+function buildDataset() {
+  const raw = document.getElementById('seqInput').value;
+  sequence = raw.split(',').map(v => parseFloat(v.trim())).filter(v => !isNaN(v));
+  lookBack  = parseInt(document.getElementById('lookBack').value) || 4;
+
+  if (sequence.length <= lookBack) {
+    alert(`Need more than ${lookBack} values. Add more data or reduce look_back.`);
+    return;
+  }
+
+  windows = [];
+  for (let i = 0; i <= sequence.length - lookBack - 1; i++) {
+    windows.push({
+      x: sequence.slice(i, i + lookBack),
+      y: sequence[i + lookBack]
+    });
+  }
+
+  updateShapeRow();
+  renderTable();
+  renderCanvas(currentStep = 0);
+  renderStats();
+
+  document.getElementById('datasetCard').style.display = '';
+  document.getElementById('vizCard').style.display = '';
+  document.getElementById('statsCard').style.display = '';
+  document.getElementById('stepTotal').textContent = windows.length;
+
+  logMsg(
+    `<span class="hi">Dataset built!</span>\n` +
+    `Sequence length : ${sequence.length}\n` +
+    `look_back       : ${lookBack}\n` +
+    `Total windows   : ${windows.length}\n` +
+    `X shape         : (${windows.length}, ${lookBack}, 1)\n` +
+    `Y shape         : (${windows.length},)\n\n` +
+    `<span class="hi3">▶ Use the step controls to walk through each window.</span>`
+  );
+}
+
+// ─── Shape row ───
+function updateShapeRow() {
+  document.getElementById('shapeRow').innerHTML = `
+    <span class="pill pill-blue">trainX: (${windows.length}, ${lookBack}, 1)</span>
+    <span class="shape-eq">→</span>
+    <span class="pill pill-purple">samples × seq_len × input_size</span>
+    <span class="shape-eq">|</span>
+    <span class="pill pill-coral">trainY: (${windows.length},)</span>
+  `;
+  document.getElementById('shapeNote').textContent =
+    `input_size=1 (univariate). The RNN sees one value per time step, ${lookBack} steps per sample.`;
+  renderWindowPreview(0);
+}
+
+// ─── Window preview ───
+function renderWindowPreview(idx) {
+  const w = windows[idx];
+  const div = document.getElementById('windowPreview');
+  let html = '';
+  w.x.forEach((v, i) => {
+    html += `<div class="win-cell active">t-${lookBack-i}<br><b>${v}</b></div>`;
+    if (i < w.x.length-1) html += `<span class="win-arrow">→</span>`;
+  });
+  html += `<span class="win-arrow" style="margin:0 6px;font-size:18px">⇒</span>`;
+  html += `<div class="win-cell target">ŷ<br><b>${w.y}</b></div>`;
+  div.innerHTML = html;
+}
+
+// ─── Table ───
+function renderTable() {
+  const thead = document.getElementById('tableHead');
+  const tbody = document.getElementById('tableBody');
+  document.getElementById('totalWindows').textContent = windows.length + ' windows';
+
+  // header
+  let hrow = '<tr><th>#</th>';
+  for (let i = 0; i < lookBack; i++) hrow += `<th>x[t-${lookBack-i}]</th>`;
+  hrow += '<th style="color:var(--coral)">y (target)</th></tr>';
+  thead.innerHTML = hrow;
+
+  // body
+  tbody.innerHTML = '';
+  windows.forEach((w, wi) => {
+    let row = `<tr><td style="color:var(--muted)">${wi}</td>`;
+    w.x.forEach((v, xi) => {
+      row += `<td><input type="number" value="${v}" onchange="updateCell(${wi},'x',${xi},this.value)"></td>`;
+    });
+    row += `<td><input type="number" value="${w.y}" style="color:var(--coral)" onchange="updateCell(${wi},'y',0,this.value)"></td>`;
+    row += '</tr>';
+    tbody.innerHTML += row;
+  });
+}
+
+function updateCell(wi, part, xi, val) {
+  val = parseFloat(val);
+  if (isNaN(val)) return;
+  if (part === 'x') windows[wi].x[xi] = val;
+  else windows[wi].y = val;
+  if (wi === currentStep) renderCanvas(currentStep);
+  renderStats();
+}
+
+// ─── Canvas RNN diagram (fully responsive) ───
+
+function renderCanvas(step) {
+  const canvas  = document.getElementById('rnnCanvas');
+  const wrap    = document.getElementById('rnn-canvas-wrap');
+  const lb      = lookBack;
+  const dpr     = window.devicePixelRatio || 1;
+  const w       = windows[step];
+  if (!w) return;
+
+  // ── Layout constants (logical px, before DPR scale) ──
+  const ROW_LABEL_W = 76;   // left gutter for row labels
+  const H0_W        = 44;   // h0 box width
+  const H0_PAD      = 10;   // gap between h0 and first cell
+  const CELL_GAP    = 22;   // gap between cells
+  const OUT_GAP     = 28;   // gap after last cell to Dense
+  const DENSE_W     = 72;
+  const OUT_BOX_W   = 78;
+  const PAD_X       = 16;   // outer left/right padding
+  const PAD_TOP     = 36;
+  const ROW_H       = 44;   // height of input / cell boxes
+  const CIRCLE_R    = 17;
+  const ROW1_Y      = PAD_TOP + 20;           // input row top
+  const ROW2_Y      = ROW1_Y + ROW_H + 36;    // RNN cell row top
+  const ROW3_CY     = ROW2_Y + ROW_H + 38;    // hidden circle centre y
+  const DENSE_Y     = ROW3_CY - 22;           // Dense box top
+  const OUT_Y       = DENSE_Y + 44 + 14;      // ŷ box top
+  const CANVAS_H    = OUT_Y + 44 + PAD_TOP;   // total logical height
+
+  // ── Compute cell width to fit container or use minimum ──
+  const containerW  = wrap.clientWidth || 700;
+  const fixedW      = PAD_X + ROW_LABEL_W + H0_W + H0_PAD
+                      + lb * ROW_H              // placeholder; recalc below
+                      + OUT_GAP + DENSE_W + 20 + OUT_BOX_W + PAD_X;
+  // minimum sensible cell width
+  const MIN_CW = 56, MAX_CW = 90;
+  // available width for cells
+  const avail = containerW - PAD_X - ROW_LABEL_W - H0_W - H0_PAD - OUT_GAP - DENSE_W - 20 - OUT_BOX_W - PAD_X - (lb - 1) * CELL_GAP;
+  let CELL_W = Math.min(MAX_CW, Math.max(MIN_CW, Math.floor(avail / lb)));
+
+  // total logical canvas width
+  const totalLogW = PAD_X + ROW_LABEL_W + H0_W + H0_PAD + lb * CELL_W + (lb-1)*CELL_GAP + OUT_GAP + DENSE_W + 20 + OUT_BOX_W + PAD_X;
+  // if it doesn't fit, allow horizontal scroll (set width > container)
+  const logW = Math.max(totalLogW, containerW);
+
+  // ── Set canvas physical size (DPR-aware for crisp text) ──
+  canvas.style.width  = logW + 'px';
+  canvas.style.height = CANVAS_H + 'px';
+  canvas.width  = Math.round(logW  * dpr);
+  canvas.height = Math.round(CANVAS_H * dpr);
+
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, logW, CANVAS_H);
+
+  // ── Font helper ──
+  const font = (size, bold) => `${bold?'600 ':''}${size}px 'JetBrains Mono', monospace`;
+
+  const C = {
+    bg3:'#1a2235', border:'#1e2d45', accent:'#38bdf8', purple:'#818cf8',
+    coral:'#fb7185', green:'#34d399', muted:'#64748b', text:'#e2e8f0', amber:'#fbbf24',
+  };
+
+  // ── Row labels (left column) ──
+  const lx = PAD_X + 4;
+  ctx.font = font(10); ctx.fillStyle = C.muted; ctx.textAlign = 'left';
+  ctx.fillText('INPUT xₜ',  lx, ROW1_Y + ROW_H/2 + 4);
+  ctx.fillText('RNN CELL',  lx, ROW2_Y + ROW_H/2 + 4);
+  ctx.fillText('HIDDEN hₜ', lx, ROW3_CY + 4);
+
+  // ── Start x of cells ──
+  const startX = PAD_X + ROW_LABEL_W + H0_W + H0_PAD;
+
+  // ── h0 box ──
+  const h0x = PAD_X + ROW_LABEL_W;
+  const h0y = ROW2_Y + (ROW_H/2) - 16;
+  roundRect(ctx, h0x, h0y, H0_W, 32, 6, C.bg3, C.border);
+  ctx.font = font(10); ctx.fillStyle = C.muted; ctx.textAlign = 'center';
+  ctx.fillText('h₀=0', h0x + H0_W/2, h0y + 20);
+  drawArrow(ctx, h0x + H0_W, h0y + 16, startX, ROW2_Y + ROW_H/2, C.muted);
+
+  // ── Per-step drawing ──
+  for (let t = 0; t < lb; t++) {
+    const cx = startX + t * (CELL_W + CELL_GAP);
+    const midX = cx + CELL_W / 2;
+
+    // ── Input box ──
+    roundRect(ctx, cx, ROW1_Y, CELL_W, ROW_H, 8, C.bg3, C.accent);
+    ctx.font = font(Math.min(13, CELL_W < 62 ? 11 : 13), true);
+    ctx.fillStyle = C.accent; ctx.textAlign = 'center';
+    // truncate value if cell is narrow
+    const valStr = String(w.x[t]).length > 6 ? Number(w.x[t]).toFixed(1) : String(w.x[t]);
+    ctx.fillText(valStr, midX, ROW1_Y + ROW_H/2 - 4);
+    ctx.font = font(9); ctx.fillStyle = C.muted;
+    ctx.fillText(`t=${t+1}`, midX, ROW1_Y + ROW_H/2 + 10);
+
+    // Arrow input → cell
+    drawArrow(ctx, midX, ROW1_Y + ROW_H, midX, ROW2_Y, C.muted);
+
+    // ── RNN Cell box ──
+    roundRect(ctx, cx, ROW2_Y, CELL_W, ROW_H, 10, '#1e2c46', C.purple);
+    ctx.font = font(11, true); ctx.fillStyle = C.purple; ctx.textAlign = 'center';
+    ctx.fillText('RNN', midX, ROW2_Y + ROW_H/2 - 4);
+    ctx.font = font(9); ctx.fillStyle = C.muted;
+    ctx.fillText(`h${t+1}`, midX, ROW2_Y + ROW_H/2 + 10);
+
+    // ── Hidden state arrow cell→cell ──
+    if (t > 0) {
+      const prevMidX = startX + (t-1) * (CELL_W + CELL_GAP) + CELL_W/2;
+      const midY = ROW2_Y + ROW_H/2;
+      drawArrow(ctx, prevMidX + CELL_W/2, midY, midX - CELL_W/2, midY, C.amber);
+    }
+
+    // Arrow cell → hidden circle
+    drawArrow(ctx, midX, ROW2_Y + ROW_H, midX, ROW3_CY - CIRCLE_R, C.muted);
+
+    // ── Hidden state circle ──
+    const isLast = t === lb - 1;
+    ctx.beginPath();
+    ctx.arc(midX, ROW3_CY, CIRCLE_R, 0, Math.PI*2);
+    ctx.fillStyle = '#1e2c46'; ctx.fill();
+    ctx.strokeStyle = isLast ? C.green : C.border;
+    ctx.lineWidth = isLast ? 2 : 1; ctx.stroke(); ctx.lineWidth = 1;
+    ctx.font = font(isLast ? 11 : 10, isLast);
+    ctx.fillStyle = isLast ? C.green : C.muted; ctx.textAlign = 'center';
+    ctx.fillText(`h${t+1}`, midX, ROW3_CY + 4);
+  }
+
+  // ── Dense + ŷ output (anchored after last cell) ──
+  const lastMidX = startX + (lb-1) * (CELL_W + CELL_GAP) + CELL_W/2;
+  const denseX   = startX + (lb-1) * (CELL_W + CELL_GAP) + CELL_W + OUT_GAP;
+
+  // arrow last h → Dense (horizontal)
+  drawArrow(ctx, lastMidX + CIRCLE_R, ROW3_CY, denseX, ROW3_CY, C.green);
+
+  roundRect(ctx, denseX, DENSE_Y, DENSE_W, 40, 8, '#1a2f1a', C.green);
+  ctx.font = font(11, true); ctx.fillStyle = C.green; ctx.textAlign = 'center';
+  ctx.fillText('Dense', denseX + DENSE_W/2, DENSE_Y + 16);
+  ctx.font = font(9); ctx.fillStyle = C.muted;
+  ctx.fillText('layer', denseX + DENSE_W/2, DENSE_Y + 30);
+
+  // arrow Dense → ŷ (vertical)
+  drawArrow(ctx, denseX + DENSE_W/2, DENSE_Y + 40, denseX + DENSE_W/2, OUT_Y, C.coral);
+
+  // ŷ box — display value, truncate if long
+  const yStr = `ŷ = ${String(w.y).length > 7 ? Number(w.y).toFixed(2) : w.y}`;
+  roundRect(ctx, denseX - 3, OUT_Y, OUT_BOX_W, 38, 8, '#2a1a1a', C.coral);
+  ctx.font = font(12, true); ctx.fillStyle = C.coral; ctx.textAlign = 'center';
+  ctx.fillText(yStr, denseX + OUT_BOX_W/2 - 3, OUT_Y + 22);
+
+  // ── Top status bar ──
+  const inputPreview = w.x.length <= 8
+    ? `[${w.x.join(', ')}]`
+    : `[${w.x.slice(0,4).join(', ')}, … ${w.x.slice(-2).join(', ')}]`;
+  ctx.font = font(10); ctx.fillStyle = C.muted; ctx.textAlign = 'left';
+  ctx.fillText(
+    `Window ${step} / ${windows.length-1}   ·   X: ${inputPreview}   →   Y: ${w.y}`,
+    PAD_X + ROW_LABEL_W, PAD_TOP - 6
+  );
+
+  // ── Update UI ──
+  document.getElementById('stepLabel').textContent  = step;
+  document.getElementById('stepInput').textContent  = `[${w.x.join(', ')}]`;
+  document.getElementById('stepTarget').textContent = w.y;
+  renderWindowPreview(step);
+
+  logMsg(
+    `<span class="hi">Window ${step}</span>  (of ${windows.length-1})\n\n` +
+    `trainX[${step}] = ${JSON.stringify(w.x.map(v => [v]))}   <span class="hi2">← shape (${lookBack}, 1)</span>\n` +
+    `trainY[${step}] = ${w.y}   <span class="warn">← target to predict</span>\n\n` +
+    `The RNN reads ${lookBack} values one by one (left→right),\n` +
+    `updating its hidden state hₜ at each step.\n` +
+    `h${lookBack} (final hidden state) → Dense → predicted ŷ\n` +
+    `Loss = (ŷ − ${w.y})²  →  backprop updates weights.`
+  );
+}
+
+// Re-render on resize so layout reflows
+window.addEventListener('resize', () => { if (windows.length) renderCanvas(currentStep); });
+
+// ─── Helpers ───
+function roundRect(ctx, x, y, w, h, r, fill, stroke) {
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y);
+  ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);
+  ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h);
+  ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r);
+  ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
+  ctx.fillStyle = fill; ctx.fill();
+  ctx.strokeStyle = stroke; ctx.lineWidth = 1.5; ctx.stroke();
+}
+
+function drawArrow(ctx, x1, y1, x2, y2, color) {
+  const angle = Math.atan2(y2-y1, x2-x1);
+  const len = Math.sqrt((x2-x1)**2+(y2-y1)**2);
+  if (len < 6) return;
+  const ex = x2 - 5*Math.cos(angle), ey = y2 - 5*Math.sin(angle);
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(ex,ey);
+  ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x2,y2);
+  ctx.lineTo(x2-9*Math.cos(angle-0.4), y2-9*Math.sin(angle-0.4));
+  ctx.lineTo(x2-9*Math.cos(angle+0.4), y2-9*Math.sin(angle+0.4));
+  ctx.closePath();
+  ctx.fillStyle = color; ctx.fill();
+}
+
+// ─── Step controls ───
+function stepTo(n) {
+  if (!windows.length) return;
+  currentStep = Math.max(0, Math.min(windows.length-1, n));
+  renderCanvas(currentStep);
+}
+function stepBy(d) { stepTo(currentStep + d); }
+
+function togglePlay() {
+  const btn = document.getElementById('btnPlay');
+  if (playTimer) {
+    clearInterval(playTimer); playTimer = null;
+    btn.textContent = '▶';
+  } else {
+    btn.textContent = '⏸';
+    playTimer = setInterval(() => {
+      if (currentStep >= windows.length-1) {
+        clearInterval(playTimer); playTimer = null;
+        btn.textContent = '▶';
+      } else stepBy(1);
+    }, 900);
+  }
+}
+
+// ─── Stats ───
+function renderStats() {
+  if (!windows.length) return;
+  const allY = windows.map(w => w.y);
+  const mn   = Math.min(...allY).toFixed(2);
+  const mx   = Math.max(...allY).toFixed(2);
+  const mean = (allY.reduce((a,b)=>a+b,0)/allY.length).toFixed(2);
+  const std  = Math.sqrt(allY.map(v=>(v-mean)**2).reduce((a,b)=>a+b,0)/allY.length).toFixed(2);
+
+  document.getElementById('statsGrid').innerHTML = `
+    <div class="stat-box"><div class="stat-label">Windows</div><div class="stat-value accent">${windows.length}</div></div>
+    <div class="stat-box"><div class="stat-label">look_back</div><div class="stat-value purple">${lookBack}</div></div>
+    <div class="stat-box"><div class="stat-label">input_size</div><div class="stat-value green">1</div></div>
+    <div class="stat-box"><div class="stat-label">X shape</div><div class="stat-value accent" style="font-size:14px">(${windows.length}, ${lookBack}, 1)</div></div>
+    <div class="stat-box"><div class="stat-label">Y min</div><div class="stat-value coral">${mn}</div></div>
+    <div class="stat-box"><div class="stat-label">Y max</div><div class="stat-value coral">${mx}</div></div>
+    <div class="stat-box"><div class="stat-label">Y mean</div><div class="stat-value" style="color:var(--amber)">${mean}</div></div>
+    <div class="stat-box"><div class="stat-label">Y std</div><div class="stat-value" style="color:var(--amber)">${std}</div></div>
+  `;
+}
+
+// ─── Log ───
+function logMsg(html) {
+  document.getElementById('log').innerHTML = html;
+}
+
+// ─── Init ───
+buildDataset();
+</script>
+</body>
+</html>
